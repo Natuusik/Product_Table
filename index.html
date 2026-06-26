@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Таблица с резервным копированием</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f5f7fb;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .backup-controls {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+        }
+        label {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 6px 12px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        button.btn-secondary {
+            background-color: #2b88d8;
+        }
+        button.btn-success {
+            background-color: #107c41; /* Цвет Excel */
+        }
+        button.btn-success:hover {
+            background-color: #0b5930;
+        }
+        button.delete-btn {
+            background-color: #e81123;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        button.delete-btn:hover {
+            background-color: #b8101c;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #e0e0e0;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f3f2f1;
+            font-weight: 600;
+        }
+        td input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            padding: 4px;
+            font-size: 14px;
+        }
+        td input:focus {
+            outline: 2px solid #0078d4;
+            background: #fff;
+        }
+        .readonly-cell {
+            background-color: #faf9f8;
+            font-weight: 600;
+        }
+        /* Скрытый инпут для загрузки файла */
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="controls">
+        <label for="globalPercent">Процент (%):</label>
+        <input type="number" id="globalPercent" value="10" min="0" oninput="calculateTable(); saveToLocalStorage();">
+        <button onclick="addRow()">Добавить строку</button>
+
+        <!-- Блок резервного копирования -->
+        <div class="backup-controls">
+            <button class="btn-success" onclick="exportToFile()">💾 Скачать бэкап</button>
+            <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">📂 Загрузить бэкап</button>
+            <input type="file" id="fileInput" accept=".json" onchange="importFromFile(this)">
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nimetus (Наименование)</th>
+                <th>Hind (Цена)</th>
+                <th>Kokku% (Итого)</th>
+                <th style="width: 50px;"></th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            <!-- Строки загружаются автоматически -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+    window.onload = function() {
+        loadFromLocalStorage();
+    };
+
+    function calculateTable() {
+        const percent = parseFloat(document.getElementById('globalPercent').value) || 0;
+        const rows = document.querySelectorAll('#tableBody tr');
+
+        rows.forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            const priceInput = inputs[1];
+            const totalCell = row.cells[2];
+            
+            const price = parseFloat(priceInput.value) || 0;
+            const total = price + (price * percent / 100);
+            
+            totalCell.textContent = Number(total.toFixed(2));
+        });
+    }
+
+    function addRow(name = "", price = "0") {
+        const tbody = document.getElementById('tableBody');
+        const tr = document.createElement('tr');
+        
+        tr.innerHTML = `
+            <td><input type="text" value="${name}" oninput="saveToLocalStorage()"></td>
+            <td><input type="number" value="${price}" oninput="calculateTable(); saveToLocalStorage();"></td>
+            <td class="readonly-cell">0</td>
+            <td><button class="delete-btn" onclick="deleteRow(this)">✕</button></td>
+        `;
+        
+        tbody.appendChild(tr);
+        calculateTable();
+        saveToLocalStorage();
+    }
+
+    function deleteRow(button) {
+        const row = button.closest('tr');
+        row.remove();
+        calculateTable();
+        saveToLocalStorage();
+    }
+
+    // Собирает текущие данные в один объект
+    function collectCurrentData() {
+        const percent = document.getElementById('globalPercent').value;
+        const rows = document.querySelectorAll('#tableBody tr');
+        const tableData = [];
+
+        rows.forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            tableData.push({
+                name: inputs[0].value,
+                price: inputs[1].value
+            });
+        });
+
+        return {
+            percent: percent,
+            rows: tableData
+        };
+    }
+
+    // Восстанавливает таблицу из переданного объекта данных
+    function renderData(data) {
+        if (!data) return;
+        
+        if (data.percent !== undefined) {
+            document.getElementById('globalPercent').value = data.percent;
+        }
+
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = ""; 
+
+        if (data.rows && data.rows.length > 0) {
+            data.rows.forEach(item => {
+                addRow(item.name, item.price);
+            });
+        }
+    }
+
+    // --- ЛОКАЛЬНОЕ АВТОСОХРАНЕНИЕ ---
+    function saveToLocalStorage() {
+        const data = collectCurrentData();
+        localStorage.setItem('excelTableFullBackup', JSON.stringify(data));
+    }
+
+    function loadFromLocalStorage() {
+        const saved = localStorage.getItem('excelTableFullBackup');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                renderData(data);
+                return;
+            } catch(e) { console.error("Ошибка чтения локальной памяти", e); }
+        }
+        
+        // Базовый шаблон при самом первом запуске
+        addRow("Põlv100", "100");
+        addRow("Põlv500", "100");
+    }
+
+    // --- ФУНКЦИЯ 1: СКАЧИВАНИЕ ФАЙЛА НА КОМПЬЮТЕР ---
+    function exportToFile() {
+        const data = collectCurrentData();
+        const jsonString = JSON.stringify(data, null, 2);
+        
+        // Создаем виртуальный файл в памяти браузера
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        // Генерируем красивую дату для названия файла (например: backup_2026-06-23.json)
+        const date = new Date().toISOString().slice(0, 10);
+        
+        // Имитируем нажатие на ссылку для скачивания
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `table_backup_${date}.json`;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Удаляем временные ссылки
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    // --- ФУНКЦИЯ 2: ВОССТАНОВЛЕНИЕ ИЗ ФАЙЛА ---
+    function importFromFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                // Проверяем, правильный ли формат файла
+                if (data && (data.percent !== undefined || data.rows)) {
+                    renderData(data);
+                    saveToLocalStorage(); // Сразу фиксируем в память браузера
+                    alert("Данные успешно восстановлены из файла!");
+                } else {
+                    alert("Ошибка: Неверная структура файла резервной копии.");
+                }
+            } catch (err) {
+                alert("Не удалось прочитать файл. Убедитесь, что это правильный .json файл.");
+            }
+            // Сбрасываем инпут, чтобы можно было загрузить тот же файл повторно
+            input.value = "";
+        };
+        reader.readAsText(file);
+    }
+</script>
+
+</body>
+</html>
