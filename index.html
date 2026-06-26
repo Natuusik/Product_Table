@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Таблица: Цена, Штуки, Процент</title>
+    <title>Исправленная Таблица с итогами</title>
     <style>
         * {
             box-sizing: border-box;
@@ -102,6 +102,10 @@
             background-color: #faf9f8;
             font-weight: 600;
         }
+        .total-row {
+            background-color: #f3f2f1;
+            font-weight: bold;
+        }
         #fileInput {
             display: none;
         }
@@ -136,6 +140,14 @@
         <tbody id="tableBody">
             <!-- Строки загружаются автоматически -->
         </tbody>
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="3" style="text-align: right;">KOKKU (ИТОГО):</td>
+                <td id="grandSumma">0</td>
+                <td id="grandKokku">0</td>
+                <td></td>
+            </tr>
+        </tfoot>
     </table>
 </div>
 
@@ -144,29 +156,36 @@
         loadFromLocalStorage();
     };
 
-    // Главная функция расчетов
     function calculateTable() {
         const percent = parseFloat(document.getElementById('globalPercent').value) || 0;
         const rows = document.querySelectorAll('#tableBody tr');
+        
+        let totalSumma = 0;
+        let totalKokku = 0;
 
         rows.forEach(row => {
             const inputs = row.querySelectorAll('input');
-            const price = parseFloat(inputs[1].value) || 0; // Цена
-            const quantity = parseFloat(inputs[2].value) || 0; // Количество (штуки)
             
-            // 1. Считаем промежуточную сумму (Цена * Количество)
+            // Четко берем инпуты по их порядку в строке
+            const price = parseFloat(inputs[1].value) || 0;     // Второй инпут — Цена
+            const quantity = parseFloat(inputs[2].value) || 0;  // Третий инпут — Штуки
+            
             const sum = price * quantity;
-            
-            // 2. Считаем итоговую сумму с процентом
             const totalWithPercent = sum + (sum * percent / 100);
             
-            // Выводим результаты в ячейки таблицы
+            totalSumma += sum;
+            totalKokku += totalWithPercent;
+            
+            // Записываем результаты в 4-ю и 5-ю ячейки (индексы 3 и 4)
             row.cells[3].textContent = Number(sum.toFixed(2));
             row.cells[4].textContent = Number(totalWithPercent.toFixed(2));
         });
+
+        // Общие итоги в самом низу
+        document.getElementById('grandSumma').textContent = Number(totalSumma.toFixed(2));
+        document.getElementById('grandKokku').textContent = Number(totalKokku.toFixed(2));
     }
 
-    // Добавление новой строки
     function addRow(name = "", price = "0", quantity = "1") {
         const tbody = document.getElementById('tableBody');
         const tr = document.createElement('tr');
@@ -229,14 +248,13 @@
         }
     }
 
-    // --- АВТОСОХРАНЕНИЕ ---
     function saveToLocalStorage() {
         const data = collectCurrentData();
-        localStorage.setItem('excelTableAdvancedBackup', JSON.stringify(data));
+        localStorage.setItem('excelTableFixedV3', JSON.stringify(data));
     }
 
     function loadFromLocalStorage() {
-        const saved = localStorage.getItem('excelTableAdvancedBackup');
+        const saved = localStorage.getItem('excelTableFixedV3');
         if (saved) {
             try {
                 const data = JSON.parse(saved);
@@ -245,12 +263,10 @@
             } catch(e) { console.error("Ошибка автозагрузки", e); }
         }
         
-        // Стартовый шаблон при первом запуске
         addRow("Põlv100", "100", "2");
         addRow("Põlv500", "50", "5");
     }
 
-    // --- СКАЧАТЬ ФАЙЛ (БЭКАП) ---
     function exportToFile() {
         const data = collectCurrentData();
         const jsonString = JSON.stringify(data, null, 2);
@@ -260,7 +276,7 @@
         
         const link = document.createElement("a");
         link.href = url;
-        link.download = `table_v2_backup_${date}.json`;
+        link.download = `table_fixed_backup_${date}.json`;
         document.body.appendChild(link);
         link.click();
         
@@ -268,7 +284,6 @@
         URL.revokeObjectURL(url);
     }
 
-    // --- ЗАГРУЗИТЬ ФАЙЛ (БЭКАП) ---
     function importFromFile(input) {
         const file = input.files[0];
         if (!file) return;
