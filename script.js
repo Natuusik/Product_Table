@@ -166,7 +166,7 @@ function addRow(name = "", price = "0", quantity = "0") {
     tr.innerHTML = `
         <td>
             <div class="name-cell-wrapper">
-                <input type="text" value="${name}" class="name-input" placeholder="Например: Põlv">
+                <input type="text" value="${name}" class="name-input" placeholder="Наименование">
                 <div class="smart-suggestions-container"></div>
             </div>
         </td>
