@@ -3,126 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Исправленная Таблица с итогами</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body {
-            background-color: #f5f7fb;
-            padding: 20px;
-            color: #333;
-        }
-        .container {
-            max-width: 950px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .controls {
-            margin-bottom: 15px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .backup-controls {
-            margin-left: auto;
-            display: flex;
-            gap: 10px;
-        }
-        label {
-            font-weight: 600;
-            font-size: 14px;
-        }
-        input[type="number"] {
-            width: 80px;
-            padding: 6px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        button {
-            padding: 6px 12px;
-            background-color: #0078d4;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-        }
-        button:hover {
-            background-color: #005a9e;
-        }
-        button.btn-secondary {
-            background-color: #2b88d8;
-        }
-        button.btn-success {
-            background-color: #107c41;
-        }
-        button.btn-success:hover {
-            background-color: #0b5930;
-        }
-        button.delete-btn {
-            background-color: #e81123;
-            padding: 4px 8px;
-            font-size: 12px;
-        }
-        button.delete-btn:hover {
-            background-color: #b8101c;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-        th, td {
-            border: 1px solid #e0e0e0;
-            padding: 10px;
-            text-align: left;
-        }
-        th {
-            background-color: #f3f2f1;
-            font-weight: 600;
-        }
-        td input {
-            width: 100%;
-            border: none;
-            background: transparent;
-            padding: 4px;
-            font-size: 14px;
-        }
-        td input:focus {
-            outline: 2px solid #0078d4;
-            background: #fff;
-        }
-        .readonly-cell {
-            background-color: #faf9f8;
-            font-weight: 600;
-        }
-        .total-row {
-            background-color: #f3f2f1;
-            font-weight: bold;
-        }
-        #fileInput {
-            display: none;
-        }
-    </style>
+    <title>Интерактивная Таблица с умной памятью</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="container">
     <div class="controls">
         <label for="globalPercent">Процент (%):</label>
-        <input type="number" id="globalPercent" value="10" min="0" oninput="calculateTable(); saveToLocalStorage();">
-        <button onclick="addRow()">Добавить строку</button>
+        <input type="number" id="globalPercent" value="10" min="0">
+        <button id="addBtn">Добавить строку</button>
+        <button id="clearBtn" class="btn-danger-clear">❌ Сбросить количество</button>
 
         <div class="backup-controls">
-            <button class="btn-success" onclick="exportToFile()">💾 Скачать бэкап</button>
-            <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">📂 Загрузить бэкап</button>
-            <input type="file" id="fileInput" accept=".json" onchange="importFromFile(this)">
+            <button id="exportBtn" class="btn-success">💾 Скачать бэкап</button>
+            <button id="importBtn" class="btn-secondary">📂 Загрузить бэкап</button>
+            <input type="file" id="fileInput" accept=".json">
         </div>
     </div>
 
@@ -138,7 +34,7 @@
             </tr>
         </thead>
         <tbody id="tableBody">
-            <!-- Строки загружаются автоматически -->
+            <!-- Строки создаются через JS -->
         </tbody>
         <tfoot>
             <tr class="total-row">
@@ -151,162 +47,6 @@
     </table>
 </div>
 
-<script>
-    window.onload = function() {
-        loadFromLocalStorage();
-    };
-
-    function calculateTable() {
-        const percent = parseFloat(document.getElementById('globalPercent').value) || 0;
-        const rows = document.querySelectorAll('#tableBody tr');
-        
-        let totalSumma = 0;
-        let totalKokku = 0;
-
-        rows.forEach(row => {
-            const inputs = row.querySelectorAll('input');
-            
-            // Четко берем инпуты по их порядку в строке
-            const price = parseFloat(inputs[1].value) || 0;     // Второй инпут — Цена
-            const quantity = parseFloat(inputs[2].value) || 0;  // Третий инпут — Штуки
-            
-            const sum = price * quantity;
-            const totalWithPercent = sum + (sum * percent / 100);
-            
-            totalSumma += sum;
-            totalKokku += totalWithPercent;
-            
-            // Записываем результаты в 4-ю и 5-ю ячейки (индексы 3 и 4)
-            row.cells[3].textContent = Number(sum.toFixed(2));
-            row.cells[4].textContent = Number(totalWithPercent.toFixed(2));
-        });
-
-        // Общие итоги в самом низу
-        document.getElementById('grandSumma').textContent = Number(totalSumma.toFixed(2));
-        document.getElementById('grandKokku').textContent = Number(totalKokku.toFixed(2));
-    }
-
-    function addRow(name = "", price = "0", quantity = "1") {
-        const tbody = document.getElementById('tableBody');
-        const tr = document.createElement('tr');
-        
-        tr.innerHTML = `
-            <td><input type="text" value="${name}" oninput="saveToLocalStorage()"></td>
-            <td><input type="number" value="${price}" oninput="calculateTable(); saveToLocalStorage();"></td>
-            <td><input type="number" value="${quantity}" min="0" oninput="calculateTable(); saveToLocalStorage();"></td>
-            <td class="readonly-cell">0</td>
-            <td class="readonly-cell">0</td>
-            <td><button class="delete-btn" onclick="deleteRow(this)">✕</button></td>
-        `;
-        
-        tbody.appendChild(tr);
-        calculateTable();
-        saveToLocalStorage();
-    }
-
-    function deleteRow(button) {
-        const row = button.closest('tr');
-        row.remove();
-        calculateTable();
-        saveToLocalStorage();
-    }
-
-    function collectCurrentData() {
-        const percent = document.getElementById('globalPercent').value;
-        const rows = document.querySelectorAll('#tableBody tr');
-        const tableData = [];
-
-        rows.forEach(row => {
-            const inputs = row.querySelectorAll('input');
-            tableData.push({
-                name: inputs[0].value,
-                price: inputs[1].value,
-                quantity: inputs[2].value
-            });
-        });
-
-        return {
-            percent: percent,
-            rows: tableData
-        };
-    }
-
-    function renderData(data) {
-        if (!data) return;
-        
-        if (data.percent !== undefined) {
-            document.getElementById('globalPercent').value = data.percent;
-        }
-
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = ""; 
-
-        if (data.rows && data.rows.length > 0) {
-            data.rows.forEach(item => {
-                addRow(item.name, item.price, item.quantity);
-            });
-        }
-    }
-
-    function saveToLocalStorage() {
-        const data = collectCurrentData();
-        localStorage.setItem('excelTableFixedV3', JSON.stringify(data));
-    }
-
-    function loadFromLocalStorage() {
-        const saved = localStorage.getItem('excelTableFixedV3');
-        if (saved) {
-            try {
-                const data = JSON.parse(saved);
-                renderData(data);
-                return;
-            } catch(e) { console.error("Ошибка автозагрузки", e); }
-        }
-        
-        addRow("Põlv100", "100", "2");
-        addRow("Põlv500", "50", "5");
-    }
-
-    function exportToFile() {
-        const data = collectCurrentData();
-        const jsonString = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonString], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const date = new Date().toISOString().slice(0, 10);
-        
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `table_fixed_backup_${date}.json`;
-        document.body.appendChild(link);
-        link.click();
-        
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }
-
-    function importFromFile(input) {
-        const file = input.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (data && data.rows) {
-                    renderData(data);
-                    saveToLocalStorage();
-                    alert("Данные успешно восстановлены!");
-                } else {
-                    alert("Ошибка: Неверная структура файла.");
-                }
-            } catch (err) {
-                alert("Ошибка чтения файла.");
-            }
-            input.value = "";
-        };
-        reader.readAsText(file);
-    }
-</script>
-
+<script src="script.js"></script>
 </body>
 </html>
