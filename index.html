@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Таблица с резервным копированием</title>
+    <title>Таблица: Цена, Штуки, Процент</title>
     <style>
         * {
             box-sizing: border-box;
@@ -15,7 +15,7 @@
             color: #333;
         }
         .container {
-            max-width: 800px;
+            max-width: 950px;
             margin: 0 auto;
             background: #fff;
             padding: 20px;
@@ -60,7 +60,7 @@
             background-color: #2b88d8;
         }
         button.btn-success {
-            background-color: #107c41; /* Цвет Excel */
+            background-color: #107c41;
         }
         button.btn-success:hover {
             background-color: #0b5930;
@@ -102,7 +102,6 @@
             background-color: #faf9f8;
             font-weight: 600;
         }
-        /* Скрытый инпут для загрузки файла */
         #fileInput {
             display: none;
         }
@@ -116,7 +115,6 @@
         <input type="number" id="globalPercent" value="10" min="0" oninput="calculateTable(); saveToLocalStorage();">
         <button onclick="addRow()">Добавить строку</button>
 
-        <!-- Блок резервного копирования -->
         <div class="backup-controls">
             <button class="btn-success" onclick="exportToFile()">💾 Скачать бэкап</button>
             <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">📂 Загрузить бэкап</button>
@@ -128,8 +126,10 @@
         <thead>
             <tr>
                 <th>Nimetus (Наименование)</th>
-                <th>Hind (Цена)</th>
-                <th>Kokku% (Итого)</th>
+                <th>Hind (Цена за шт.)</th>
+                <th>Kogus (Штук)</th>
+                <th>Summa (Сумма)</th>
+                <th>Kokku% (Итого с %)</th>
                 <th style="width: 50px;"></th>
             </tr>
         </thead>
@@ -144,29 +144,38 @@
         loadFromLocalStorage();
     };
 
+    // Главная функция расчетов
     function calculateTable() {
         const percent = parseFloat(document.getElementById('globalPercent').value) || 0;
         const rows = document.querySelectorAll('#tableBody tr');
 
         rows.forEach(row => {
             const inputs = row.querySelectorAll('input');
-            const priceInput = inputs[1];
-            const totalCell = row.cells[2];
+            const price = parseFloat(inputs[1].value) || 0; // Цена
+            const quantity = parseFloat(inputs[2].value) || 0; // Количество (штуки)
             
-            const price = parseFloat(priceInput.value) || 0;
-            const total = price + (price * percent / 100);
+            // 1. Считаем промежуточную сумму (Цена * Количество)
+            const sum = price * quantity;
             
-            totalCell.textContent = Number(total.toFixed(2));
+            // 2. Считаем итоговую сумму с процентом
+            const totalWithPercent = sum + (sum * percent / 100);
+            
+            // Выводим результаты в ячейки таблицы
+            row.cells[3].textContent = Number(sum.toFixed(2));
+            row.cells[4].textContent = Number(totalWithPercent.toFixed(2));
         });
     }
 
-    function addRow(name = "", price = "0") {
+    // Добавление новой строки
+    function addRow(name = "", price = "0", quantity = "1") {
         const tbody = document.getElementById('tableBody');
         const tr = document.createElement('tr');
         
         tr.innerHTML = `
             <td><input type="text" value="${name}" oninput="saveToLocalStorage()"></td>
             <td><input type="number" value="${price}" oninput="calculateTable(); saveToLocalStorage();"></td>
+            <td><input type="number" value="${quantity}" min="0" oninput="calculateTable(); saveToLocalStorage();"></td>
+            <td class="readonly-cell">0</td>
             <td class="readonly-cell">0</td>
             <td><button class="delete-btn" onclick="deleteRow(this)">✕</button></td>
         `;
@@ -183,7 +192,6 @@
         saveToLocalStorage();
     }
 
-    // Собирает текущие данные в один объект
     function collectCurrentData() {
         const percent = document.getElementById('globalPercent').value;
         const rows = document.querySelectorAll('#tableBody tr');
@@ -193,7 +201,8 @@
             const inputs = row.querySelectorAll('input');
             tableData.push({
                 name: inputs[0].value,
-                price: inputs[1].value
+                price: inputs[1].value,
+                quantity: inputs[2].value
             });
         });
 
@@ -203,7 +212,6 @@
         };
     }
 
-    // Восстанавливает таблицу из переданного объекта данных
     function renderData(data) {
         if (!data) return;
         
@@ -216,57 +224,51 @@
 
         if (data.rows && data.rows.length > 0) {
             data.rows.forEach(item => {
-                addRow(item.name, item.price);
+                addRow(item.name, item.price, item.quantity);
             });
         }
     }
 
-    // --- ЛОКАЛЬНОЕ АВТОСОХРАНЕНИЕ ---
+    // --- АВТОСОХРАНЕНИЕ ---
     function saveToLocalStorage() {
         const data = collectCurrentData();
-        localStorage.setItem('excelTableFullBackup', JSON.stringify(data));
+        localStorage.setItem('excelTableAdvancedBackup', JSON.stringify(data));
     }
 
     function loadFromLocalStorage() {
-        const saved = localStorage.getItem('excelTableFullBackup');
+        const saved = localStorage.getItem('excelTableAdvancedBackup');
         if (saved) {
             try {
                 const data = JSON.parse(saved);
                 renderData(data);
                 return;
-            } catch(e) { console.error("Ошибка чтения локальной памяти", e); }
+            } catch(e) { console.error("Ошибка автозагрузки", e); }
         }
         
-        // Базовый шаблон при самом первом запуске
-        addRow("Põlv100", "100");
-        addRow("Põlv500", "100");
+        // Стартовый шаблон при первом запуске
+        addRow("Põlv100", "100", "2");
+        addRow("Põlv500", "50", "5");
     }
 
-    // --- ФУНКЦИЯ 1: СКАЧИВАНИЕ ФАЙЛА НА КОМПЬЮТЕР ---
+    // --- СКАЧАТЬ ФАЙЛ (БЭКАП) ---
     function exportToFile() {
         const data = collectCurrentData();
         const jsonString = JSON.stringify(data, null, 2);
-        
-        // Создаем виртуальный файл в памяти браузера
         const blob = new Blob([jsonString], { type: "application/json" });
         const url = URL.createObjectURL(blob);
-        
-        // Генерируем красивую дату для названия файла (например: backup_2026-06-23.json)
         const date = new Date().toISOString().slice(0, 10);
         
-        // Имитируем нажатие на ссылку для скачивания
         const link = document.createElement("a");
         link.href = url;
-        link.download = `table_backup_${date}.json`;
+        link.download = `table_v2_backup_${date}.json`;
         document.body.appendChild(link);
         link.click();
         
-        // Удаляем временные ссылки
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     }
 
-    // --- ФУНКЦИЯ 2: ВОССТАНОВЛЕНИЕ ИЗ ФАЙЛА ---
+    // --- ЗАГРУЗИТЬ ФАЙЛ (БЭКАП) ---
     function importFromFile(input) {
         const file = input.files[0];
         if (!file) return;
@@ -275,19 +277,16 @@
         reader.onload = function(e) {
             try {
                 const data = JSON.parse(e.target.result);
-                
-                // Проверяем, правильный ли формат файла
-                if (data && (data.percent !== undefined || data.rows)) {
+                if (data && data.rows) {
                     renderData(data);
-                    saveToLocalStorage(); // Сразу фиксируем в память браузера
-                    alert("Данные успешно восстановлены из файла!");
+                    saveToLocalStorage();
+                    alert("Данные успешно восстановлены!");
                 } else {
-                    alert("Ошибка: Неверная структура файла резервной копии.");
+                    alert("Ошибка: Неверная структура файла.");
                 }
             } catch (err) {
-                alert("Не удалось прочитать файл. Убедитесь, что это правильный .json файл.");
+                alert("Ошибка чтения файла.");
             }
-            // Сбрасываем инпут, чтобы можно было загрузить тот же файл повторно
             input.value = "";
         };
         reader.readAsText(file);
